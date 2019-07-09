@@ -24,4 +24,5 @@ if __name__ == '__main__':
     # a_list = "/price/series-412.html#pvareaid=2042205,/price/series-4460.html#pvareaid=2042205"
     # list = a_list.split(",")
     # list.reverse()
-    print sys.getdefaultencoding()
+    list = ["aaa","bbb","ccc","ddd"]
+    print ",".join(list)

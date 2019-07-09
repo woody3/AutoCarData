@@ -7,6 +7,7 @@ from requests import ConnectionError, Timeout, ConnectTimeout
 from lxml import etree
 import time
 from fake_useragent import UserAgent
+from ExceptionHandler import AutoCarException
 
 # 对爬取到数据重新编码，防止写入文件后出现乱码
 def re_encode(param, coding_format = "utf-8"):
@@ -33,7 +34,7 @@ def channel_file_op(file_name, operator, data=""):
 # 爬取的数据写入文件
 def wrire_to_file(info_list, name, pattern_name, brand_name):
     path = os.path.abspath('../datas')
-    file_name = "%s%s.csv" % (brand_name.decode("utf-8"), pattern_name.decode("utf-8"))
+    file_name = "%s-%s.csv" % (brand_name.decode("utf-8"), pattern_name.decode("utf-8"))
     # file_path = os.path.join(path, "cars.csv")
     file_path = os.path.join(path, file_name)
 
@@ -73,6 +74,7 @@ if __name__ == '__main__':
     pattern_list = (channel_file_op("pattern_list.txt", "r"))
     sub_list = (channel_file_op("sub_list.txt", "r"))
     sub_name_list = (channel_file_op("sub_name_list.txt", "r"))
+    retry_times = 0
     if len(brand_list) == 0:
         brand_res_text = requests.get(start_url, headers=headers).text
         brand_text = brand_res_text.encode('unicode-escape').decode('string_escape')
@@ -80,14 +82,19 @@ if __name__ == '__main__':
         brand_list.reverse()
 
     while (len(brand_list) > 0):
+        missing_infos = []
         brand = brand_list.pop()
         pattern_url = "%s%s" % (domain, brand)
-        print "开始爬取:",pattern_url
+        print "开始爬取:", pattern_url
+        if retry_times > 5:
+            raise AutoCarException("ConnectException : connect error or time out")
         try:
             response_data = requests.get(pattern_url, headers=headers)
             pattern_res_text = response_data.text
-            if response_data.status_code >= 400:
-                raise RuntimeError
+            if response_data.status_code >= 500:
+                raise AutoCarException("ServerException : server is not available")
+            elif response_data.status_code >= 400:
+                raise AutoCarException("ClientRequestException : request error")
             pattern_text = pattern_res_text.encode('unicode-escape').decode('string_escape')
             if len(pattern_list) == 0:
                 pattern_list = re.findall(r"/price/series-[0-9\-]*.html#pvareaid=2042205", pattern_text)
@@ -97,16 +104,24 @@ if __name__ == '__main__':
                 pattern = pattern_list.pop()
                 sub_url = "%s%s" % (domain, pattern)
                 print "开始爬取:", sub_url
+                if retry_times > 5:
+                    raise AutoCarException("ConnectException : connect error or time out")
                 try:
                     sub_response = requests.get(sub_url, headers=headers)
                     sub_res_text = sub_response.text
-                    if sub_response.status_code >= 400:
-                        raise RuntimeError
+                    if response_data.status_code >= 500:
+                        raise AutoCarException("ServerException : server is not available")
+                    elif response_data.status_code >= 400:
+                        raise AutoCarException("ClientRequestException : request error")
                     sub_text = sub_res_text.encode('unicode-escape').decode('string_escape')
                     tree = etree.HTML(sub_text)
 
                     pattern_name_init = tree.xpath("//div[@class='main-title']/a/text()")[0]
-                    print "开始爬取车型：", pattern_name_init.decode('unicode_escape').encode("utf-8")
+                    try:
+                        pattern_name = pattern_name_init.decode('unicode_escape').encode("utf-8")
+                    except ValueError as e:
+                        pattern_name = pattern_name_init.encode("utf-8")
+                    print "开始爬取车型：", pattern_name
                     # sub_list = re.findall(r"//www.autohome.com.cn/spec/\d+/#pvareaid=\d+", sub_text)
                     # sub_list = tree.xpath("//div[@id='divSeries']//div[@class='interval01-list-cars']//a/@href")
                     if len(sub_list) == 0:
@@ -114,12 +129,22 @@ if __name__ == '__main__':
                         sub_list = tree.xpath("//div[@id='divSeries']//div[@class='interval01-list-cars']/../@data-value")
                         sub_name_list.reverse()
                         sub_list.reverse()
-                    brand_name = tree.xpath("//div[@class='cartab-title']/h2/a/text()")[0]
+                    brand_name_init = tree.xpath("//div[@class='cartab-title']/h2/a/text()")[0]
+                    brand_name = brand_name_init.decode('unicode_escape').encode("utf-8")
 
                     while(len(sub_list) > 0):
                         car_no = sub_list.pop()
                         car_name_init = sub_name_list.pop()
-                        print "开始爬取款式：", car_name_init.decode('unicode_escape').encode("utf-8")
+                        if retry_times > 5:
+                            raise AutoCarException("ConnectException : connect error or time out")
+
+                        # 这里主要是处理不常见特殊的字符，比如德文字母，俄文字母，意大利文字母等等，unicode_escape出现转码错误后，
+                        # 强制用utf-8转换成str类型，保证程序继续爬取运行
+                        try:
+                            car_name = car_name_init.decode('unicode_escape').encode("utf-8")
+                        except ValueError as e:
+                            car_name = car_name_init.encode("utf-8")
+                        print "开始爬取款式：", car_name
                         # pageSize参数最大只能是30，经测试，设置的值超过30都默认是10
                         init_url = "https://dealer.autohome.com.cn/handler/other/getdata?__action=dealerlq.getdealerlistspec&provinceId=0&cityId=0&countyId=0&pageSize=30&specId=%s" % car_no
                         data = {}
@@ -131,18 +156,6 @@ if __name__ == '__main__':
                             init_data = json.loads(data_res)
                             pages = 0
                             info_list = []
-
-                            # 这里主要是处理不常见特殊的字符，比如德文字母，俄文字母，意大利文字母等等，unicode_escape出现转码错误后，
-                            # 强制用utf-8转换成str类型，保证程序继续爬取运行
-                            try:
-                                pattern_name = pattern_name_init.decode('unicode_escape').encode("utf-8")
-                            except ValueError as e:
-                                pattern_name = pattern_name_init.encode("utf-8")
-                            try:
-                                car_name = car_name_init.decode('unicode_escape').encode("utf-8")
-                            except ValueError as e:
-                                car_name = car_name_init.encode("utf-8")
-                            brand_name = brand_name.decode('unicode_escape').encode("utf-8")
 
                             if init_data.get("result"):
                                 pages = init_data.get("result").get("pagecount")
@@ -174,8 +187,12 @@ if __name__ == '__main__':
                         except(ConnectionError, Timeout, ConnectTimeout) as expt:
                             sub_list.append(car_no)
                             sub_name_list.append(car_name_init)
+                            retry_times += 1
+                            print "连接错误，开始重试"
                         except SyntaxError as expt:
                             print "出现编码转换错误:",expt
+                            miss_sub = "丢失爬取的款式详情：%s => %s => %s-%s" % (brand_name, pattern_name, car_name_init, car_no)
+                            channel_file_op("missing_info.txt", "a", miss_sub)
                         except Exception as expt:
                             sub_list.append(car_no)
                             sub_name_list.append(car_name_init)
@@ -185,8 +202,11 @@ if __name__ == '__main__':
                             raise expt
                 except (ConnectionError, Timeout, ConnectTimeout) as ex:
                     pattern_list.append(pattern)
+                    retry_times += 1
                 except (SyntaxError, ValueError) as ex:
                     print "出现编码转换错误:",ex
+                    miss_pattern = "丢失爬取的车型链接：%s" % pattern
+                    channel_file_op("missing_info.txt", "a", miss_pattern)
                 except Exception as ex:
                     pattern_list.append(pattern)
                     channel_file_op("pattern_list.txt", "w", ",".join(pattern_list))
@@ -194,8 +214,11 @@ if __name__ == '__main__':
                     raise ex
         except (ConnectionError, Timeout, ConnectTimeout) as e:
             brand_list.append(brand)
+            retry_times += 1
         except (SyntaxError, ValueError) as e:
             print "出现编码转换错误:", e
+            miss_brand = "丢失爬取的品牌链接：%s" % brand
+            channel_file_op("missing_info.txt", "a", miss_brand)
         except Exception as e:
             brand_list.append(brand)
             channel_file_op("brand_list.txt", "a", ",".join(brand_list))
