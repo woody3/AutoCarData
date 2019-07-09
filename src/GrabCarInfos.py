@@ -9,14 +9,16 @@ import time
 from fake_useragent import UserAgent
 from ExceptionHandler import AutoCarException
 
+
 # 对爬取到数据重新编码，防止写入文件后出现乱码
-def re_encode(param, coding_format = "utf-8"):
+def re_encode(param, coding_format="utf-8"):
     if isinstance(param, int):
         return str(param)
     elif param is None:
         return ""
     else:
         return param.encode(coding_format, "ignore")
+
 
 # 断点续爬读取文件，运行异常时记录断点处数据
 def channel_file_op(file_name, operator, data=""):
@@ -30,6 +32,7 @@ def channel_file_op(file_name, operator, data=""):
         with open(file_path, mode=operator) as f:
             f.write(data)
             f.flush()
+
 
 # 爬取的数据写入文件
 def wrire_to_file(info_list, name, pattern_name, brand_name):
@@ -54,15 +57,21 @@ def wrire_to_file(info_list, name, pattern_name, brand_name):
             sell_phone = re_encode(info_list[i].get("dealerInfoBaseOut").get("sellPhone"))
             cellphone = re_encode(info_list[i].get("yphone"))
 
-            # print brand_name, pattern_name, name, province, city, county, address, dealer, min_price, max_price, sell_phone, cellphone
+            # print brand_name, pattern_name, name, province, city, \
+            #     county, address, dealer, min_price, max_price, sell_phone, cellphone
             if data == "":
-                data = "%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n" % (brand_name, pattern_name, name, province, city, county, address, dealer, min_price, max_price, sell_phone, cellphone)
+                data = "%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n" % (
+                    brand_name, pattern_name, name, province, city, county, address, dealer, min_price, max_price,
+                    sell_phone, cellphone)
             else:
-                data = "%s%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n" % (data, brand_name, pattern_name, name, province, city, county, address, dealer, min_price, max_price, sell_phone, cellphone)
+                data = "%s%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n" % (
+                    data, brand_name, pattern_name, name, province, city, county, address, dealer, min_price, max_price,
+                    sell_phone, cellphone)
 
         # print data
         with open(file_path, mode='a+') as f:
             f.write(data)
+
 
 if __name__ == '__main__':
 
@@ -81,8 +90,7 @@ if __name__ == '__main__':
         brand_list = re.findall(r"/price/brand-\d+.html", brand_text)
         brand_list.reverse()
 
-    while (len(brand_list) > 0):
-        missing_infos = []
+    while len(brand_list) > 0:
         brand = brand_list.pop()
         pattern_url = "%s%s" % (domain, brand)
         print "开始爬取:", pattern_url
@@ -100,7 +108,7 @@ if __name__ == '__main__':
                 pattern_list = re.findall(r"/price/series-[0-9\-]*.html#pvareaid=2042205", pattern_text)
                 pattern_list.reverse()
 
-            while (len(pattern_list) > 0):
+            while len(pattern_list) > 0:
                 pattern = pattern_list.pop()
                 sub_url = "%s%s" % (domain, pattern)
                 print "开始爬取:", sub_url
@@ -125,14 +133,16 @@ if __name__ == '__main__':
                     # sub_list = re.findall(r"//www.autohome.com.cn/spec/\d+/#pvareaid=\d+", sub_text)
                     # sub_list = tree.xpath("//div[@id='divSeries']//div[@class='interval01-list-cars']//a/@href")
                     if len(sub_list) == 0:
-                        sub_name_list = tree.xpath("//div[@id='divSeries']//div[@class='interval01-list-cars']//a/text()")
-                        sub_list = tree.xpath("//div[@id='divSeries']//div[@class='interval01-list-cars']/../@data-value")
+                        sub_name_list = tree.xpath(
+                            "//div[@id='divSeries']//div[@class='interval01-list-cars']//a/text()")
+                        sub_list = tree.xpath(
+                            "//div[@id='divSeries']//div[@class='interval01-list-cars']/../@data-value")
                         sub_name_list.reverse()
                         sub_list.reverse()
                     brand_name_init = tree.xpath("//div[@class='cartab-title']/h2/a/text()")[0]
                     brand_name = brand_name_init.decode('unicode_escape').encode("utf-8")
 
-                    while(len(sub_list) > 0):
+                    while len(sub_list) > 0:
                         car_no = sub_list.pop()
                         car_name_init = sub_name_list.pop()
                         if retry_times > 5:
@@ -170,12 +180,12 @@ if __name__ == '__main__':
                                   (brand_name, pattern_name, car_name, pages, 1)
 
                             if pages > 1:
-                                for page in xrange(pages-1):
+                                for page in xrange(pages - 1):
                                     print "正在爬取: %s => %s => %s , 共%d页，当前爬取第%d页" % \
-                                          (brand_name, pattern_name, car_name, pages, page+2)
-                                    request_url = "%s&pageIndex=%s" % (init_url, str(page+2))
+                                          (brand_name, pattern_name, car_name, pages, page + 2)
+                                    request_url = "%s&pageIndex=%s" % (init_url, str(page + 2))
                                     data_re_son = requests.get(request_url, headers=headers)
-                                    time.sleep(0.5)       # 反防爬，每次请求后休眠500ms
+                                    time.sleep(0.5)  # 反防爬，每次请求后休眠500ms
                                     data_re = data_re_son.text
                                     if data_re_son.status_code >= 400:
                                         raise RuntimeError
@@ -190,7 +200,7 @@ if __name__ == '__main__':
                             retry_times += 1
                             print "连接错误，开始重试"
                         except SyntaxError as expt:
-                            print "出现编码转换错误:",expt
+                            print "出现编码转换错误:", expt
                             miss_sub = "丢失爬取的款式详情：%s => %s => %s-%s" % (brand_name, pattern_name, car_name_init, car_no)
                             channel_file_op("missing_info.txt", "a", miss_sub)
                         except Exception as expt:
@@ -204,7 +214,7 @@ if __name__ == '__main__':
                     pattern_list.append(pattern)
                     retry_times += 1
                 except (SyntaxError, ValueError) as ex:
-                    print "出现编码转换错误:",ex
+                    print "出现编码转换错误:", ex
                     miss_pattern = "丢失爬取的车型链接：%s" % pattern
                     channel_file_op("missing_info.txt", "a", miss_pattern)
                 except Exception as ex:
@@ -230,10 +240,3 @@ if __name__ == '__main__':
     channel_file_op("pattern_list.txt", "w")
     channel_file_op("sub_name_list.txt", "w")
     channel_file_op("sub_list.txt", "w")
-
-
-
-
-
-
-
