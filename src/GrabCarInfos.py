@@ -161,8 +161,10 @@ if __name__ == '__main__':
                         try:
                             data_response = requests.get(init_url, headers=headers)
                             data_res = data_response.text
-                            if data_response.status_code >= 400:
-                                raise RuntimeError
+                            if response_data.status_code >= 500:
+                                raise AutoCarException("ServerException : server is not available")
+                            elif response_data.status_code >= 400:
+                                raise AutoCarException("ClientRequestException : request error")
                             init_data = json.loads(data_res)
                             pages = 0
                             info_list = []
@@ -198,6 +200,7 @@ if __name__ == '__main__':
                             sub_list.append(car_no)
                             sub_name_list.append(car_name_init)
                             retry_times += 1
+                            sleep(3) #休眠3秒后再尝试连接
                             print "连接错误，开始重试"
                         except SyntaxError as expt:
                             print "出现编码转换错误:", expt
@@ -213,6 +216,8 @@ if __name__ == '__main__':
                 except (ConnectionError, Timeout, ConnectTimeout) as ex:
                     pattern_list.append(pattern)
                     retry_times += 1
+                    sleep(3) #休眠3秒后再尝试连接
+                    print "连接错误，开始重试"
                 except (SyntaxError, ValueError) as ex:
                     print "出现编码转换错误:", ex
                     miss_pattern = "丢失爬取的车型链接：%s" % pattern
@@ -225,6 +230,8 @@ if __name__ == '__main__':
         except (ConnectionError, Timeout, ConnectTimeout) as e:
             brand_list.append(brand)
             retry_times += 1
+            sleep(3) #休眠3秒后再尝试连接
+            print "连接错误，开始重试"
         except (SyntaxError, ValueError) as e:
             print "出现编码转换错误:", e
             miss_brand = "丢失爬取的品牌链接：%s" % brand
