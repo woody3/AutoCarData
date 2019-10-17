@@ -91,6 +91,7 @@ if __name__ == '__main__':
         brand_list.reverse()
 
     while len(brand_list) > 0:
+        headers = {"User-Agent": UserAgent().random}
         brand = brand_list.pop()
         pattern_url = "%s%s" % (domain, brand)
         print "开始爬取:", pattern_url
@@ -109,6 +110,7 @@ if __name__ == '__main__':
                 pattern_list.reverse()
 
             while len(pattern_list) > 0:
+                headers = {"User-Agent": UserAgent().random}
                 pattern = pattern_list.pop()
                 sub_url = "%s%s" % (domain, pattern)
                 print "开始爬取:", sub_url
@@ -157,6 +159,7 @@ if __name__ == '__main__':
                         print "开始爬取款式：", car_name
                         # pageSize参数最大只能是30，经测试，设置的值超过30都默认是10
                         init_url = "https://dealer.autohome.com.cn/handler/other/getdata?__action=dealerlq.getdealerlistspec&provinceId=0&cityId=0&countyId=0&pageSize=30&specId=%s" % car_no
+                        headers = {"User-Agent": UserAgent().random}
                         data = {}
                         try:
                             data_response = requests.get(init_url, headers=headers)
@@ -186,6 +189,7 @@ if __name__ == '__main__':
                                     print "正在爬取: %s => %s => %s , 共%d页，当前爬取第%d页" % \
                                           (brand_name, pattern_name, car_name, pages, page + 2)
                                     request_url = "%s&pageIndex=%s" % (init_url, str(page + 2))
+                                    headers = {"User-Agent": UserAgent().random}
                                     data_re_son = requests.get(request_url, headers=headers)
                                     time.sleep(0.5)  # 反防爬，每次请求后休眠500ms
                                     data_re = data_re_son.text
