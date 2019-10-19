@@ -91,7 +91,6 @@ if __name__ == '__main__':
         brand_list.reverse()
 
     while len(brand_list) > 0:
-        headers = {"User-Agent": UserAgent().random}
         brand = brand_list.pop()
         pattern_url = "%s%s" % (domain, brand)
         print "开始爬取:", pattern_url
